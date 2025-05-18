@@ -1,0 +1,238 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Галерея</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: #fff;
+            overflow-x: hidden;
+        }
+        .auth-container, .gallery-container {
+            max-width: 1200px;
+            margin: 50px auto;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(50px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        .auth-container.show, .gallery-container.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .auth-container h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+        input[type="password"] {
+            padding: 12px;
+            font-size: 1.2em;
+            border: 2px solid #fff;
+            border-radius: 8px;
+            margin-right: 10px;
+            background-color: #333;
+            color: #fff;
+            width: 200px;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 1.2em;
+            background-color: #444;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        button:hover {
+            background-color: #666;
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+        }
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            padding: 20px;
+        }
+        .gallery img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 2px solid #fff;
+            transition: transform 0.5s ease, box-shadow 0.5s ease, opacity 0.5s ease;
+            opacity: 0;
+        }
+        .gallery img.loaded {
+            opacity: 1;
+            animation: fadeIn 1s ease forwards;
+        }
+        .gallery img:hover {
+            transform: scale(1.1);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.7);
+        }
+        .error {
+            color: #ff4444;
+            margin-top: 10px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .error.show {
+            opacity: 1;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        footer {
+            text-align: center;
+            padding: 20px;
+            background-color: #111;
+            color: white;
+            position: relative;
+            bottom: 0;
+            width: 100%;
+            box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="auth-container" id="auth">
+        <h1>Введите код доступа</h1>
+        <input type="password" id="passcode" placeholder="Введите код">
+        <button onclick="checkPasscode()">Открыть</button>
+        <p class="error" id="error">Неверный код!</p>
+    </div>
+    <div class="gallery-container" id="gallery" style="display: none;">
+        <h1>Галерея</h1>
+        <div class="gallery">
+            <!-- Замените src на прямые ссылки к вашим изображениям (например, из Imgur) -->
+            <img src="https://via.placeholder.com/300x200?text=Photo+1" alt="Photo 1">
+            <img src="https://via.placeholder.com/300x200?text=Photo+2" alt="Photo 2">
+            <img src="https://via.placeholder.com/300x200?text=Photo+3" alt="Photo 3">
+            <img src="https://via.placeholder.com/300x200?text=Photo+4" alt="Photo 4">
+            <img src="https://via.placeholder.com/300x200?text=Photo+5" alt="Photo 5">
+            <img src="https://via.placeholder.com/300x200?text=Photo+6" alt="Photo 6">
+            <img src="https://via.placeholder.com/300x200?text=Photo+7" alt="Photo 7">
+            <img src="https://via.placeholder.com/300x200?text=Photo+8" alt="Photo 8">
+            <img src="https://via.placeholder.com/300x200?text=Photo+9" alt="Photo 9">
+            <img src="https://via.placeholder.com/300x200?text=Photo+10" alt="Photo 10">
+            <img src="https://via.placeholder.com/300x200?text=Photo+11" alt="Photo 11">
+            <img src="https://via.placeholder.com/300x200?text=Photo+12" alt="Photo 12">
+            <img src="https://via.placeholder.com/300x200?text=Photo+13" alt="Photo 13">
+            <img src="https://via.placeholder.com/300x200?text=Photo+14" alt="Photo 14">
+            <img src="https://via.placeholder.com/300x200?text=Photo+15" alt="Photo 15">
+            <img src="https://via.placeholder.com/300x200?text=Photo+16" alt="Photo 16">
+            <img src="https://via.placeholder.com/300x200?text=Photo+17" alt="Photo 17">
+            <img src="https://via.placeholder.com/300x200?text=Photo+18" alt="Photo 18">
+            <img src="https://via.placeholder.com/300x200?text=Photo+19" alt="Photo 19">
+            <img src="https://via.placeholder.com/300x200?text=Photo+20" alt="Photo 20">
+            <img src="https://via.placeholder.com/300x200?text=Photo+21" alt="Photo 21">
+            <img src="https://via.placeholder.com/300x200?text=Photo+22" alt="Photo 22">
+            <img src="https://via.placeholder.com/300x200?text=Photo+23" alt="Photo 23">
+            <img src="https://via.placeholder.com/300x200?text=Photo+24" alt="Photo 24">
+            <img src="https://via.placeholder.com/300x200?text=Photo+25" alt="Photo 25">
+            <img src="https://via.placeholder.com/300x200?text=Photo+26" alt="Photo 26">
+            <img src="https://via.placeholder.com/300x200?text=Photo+27" alt="Photo 27">
+            <img src="https://via.placeholder.com/300x200?text=Photo+28" alt="Photo 28">
+            <img src="https://via.placeholder.com/300x200?text=Photo+29" alt="Photo 29">
+            <img src="https://via.placeholder.com/300x200?text=Photo+30" alt="Photo 30">
+            <img src="https://via.placeholder.com/300x200?text=Photo+31" alt="Photo 31">
+            <img src="https://via.placeholder.com/300x200?text=Photo+32" alt="Photo 32">
+            <img src="https://via.placeholder.com/300x200?text=Photo+33" alt="Photo 33">
+            <img src="https://via.placeholder.com/300x200?text=Photo+34" alt="Photo 34">
+            <img src="https://via.placeholder.com/300x200?text=Photo+35" alt="Photo 35">
+            <img src="https://via.placeholder.com/300x200?text=Photo+36" alt="Photo 36">
+            <img src="https://via.placeholder.com/300x200?text=Photo+37" alt="Photo 37">
+            <img src="https://via.placeholder.com/300x200?text=Photo+38" alt="Photo 38">
+            <img src="https://via.placeholder.com/300x200?text=Photo+39" alt="Photo 39">
+            <img src="https://via.placeholder.com/300x200?text=Photo+40" alt="Photo 40">
+        </div>
+    </div>
+    <footer>
+        <p>© 2025 Галерея</p>
+    </footer>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('auth').classList.add('show');
+        });
+
+        function checkPasscode() {
+            const passcode = document.getElementById('passcode').value;
+            const error = document.getElementById('error');
+            if (passcode === '2508') {
+                document.getElementById('auth').style.display = 'none';
+                const gallery = document.getElementById('gallery');
+                gallery.style.display = 'block';
+                gallery.classList.add('show');
+                loadImages();
+            } else {
+                error.classList.add('show');
+                setTimeout(() => error.classList.remove('show'), 2000);
+            }
+        }
+
+        function loadImages() {
+            const images = document.querySelectorAll('.gallery img');
+            images.forEach((img, index) => {
+                setTimeout(() => {
+                    img.classList.add('loaded');
+                }, index * 100);
+            });
+        }
+
+        document.getElementById('passcode').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') checkPasscode();
+        });
+    </script>
+</body>
+</html>
