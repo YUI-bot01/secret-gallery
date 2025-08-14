@@ -1,0 +1,293 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+
+<html lang="ru">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Галерея</title>
+<style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: #fff;
+            overflow-x: hidden;
+        }
+        .auth-container, .gallery-container {
+            max-width: 1200px;
+            margin: 50px auto;
+            text-align: center;
+            opacity: 0;
+            transform: translateY(50px);
+            transition: opacity 0.8s ease, transform 0.8s ease;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+        .auth-container.show, .gallery-container.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .auth-container h1 {
+            font-size: 2.5em;
+            margin-bottom: 20px;
+        }
+        input[type="password"] {
+            padding: 12px;
+            font-size: 1.2em;
+            border: 2px solid #fff;
+            border-radius: 8px;
+            margin-right: 10px;
+            background-color: #333;
+            color: #fff;
+            width: 200px;
+        }
+        button {
+            padding: 12px 24px;
+            font-size: 1.2em;
+            background-color: #444;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        button:hover {
+            background-color: #666;
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+        }
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            padding: 20px;
+        }
+        .gallery img {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+            border: 2px solid #fff;
+            transition: transform 0.5s ease, box-shadow 0.5s ease, opacity 0.5s ease;
+            opacity: 0;
+        }
+        .gallery img.loaded {
+            opacity: 1;
+            animation: fadeIn 1s ease forwards;
+        }
+        .gallery img:hover {
+            transform: scale(1.1);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.7);
+        }
+        .error {
+            color: #ff4444;
+            margin-top: 10px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .error.show {
+            opacity: 1;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.8); }
+            to { opacity: 1; transform: scale(1); }
+        }
+        footer {
+            text-align: center;
+            padding: 20px;
+            background-color: #111;
+            color: white;
+            position: relative;
+            bottom: 0;
+            width: 100%;
+            box-shadow: 0 -5px 15px rgba(0, 0, 0, 0.5);
+        }
+            <style>
+/* Модальное окно */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  padding-top: 60px;
+  left: 0; top: 0;
+  width: 100%; height: 100%;
+  background-color: rgba(0,0,0,0.9);
+}
+.modal-content {
+  margin: auto;
+  display: block;
+  max-width: 80%;
+  max-height: 80%;
+  position: relative;
+}
+.close {
+  position: absolute;
+  top: 20px; right: 35px;
+  color: white;
+  font-size: 40px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* Лупа */
+.lens {
+  position: absolute;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  width: 120px;
+  height: 120px;
+  background-repeat: no-repeat;
+  background-size: 200%;
+  pointer-events: none;
+}
+</style>
+
+
+
+<link href="https://cdnjs.cloudflare.com/ajax/libs/viewerjs/1.11.6/viewer.min.css" rel="stylesheet"/><script src="https://cdnjs.cloudflare.com/ajax/libs/viewerjs/1.11.6/viewer.min.js"></script></head>
+<body>
+<div class="auth-container" id="auth">
+<h1>Введите код доступа</h1>
+<input id="passcode" placeholder="Введите код" type="password"/>
+<button onclick="checkPasscode()">Открыть</button>
+<p class="error" id="error">Неверный код!</p>
+</div>
+<div class="gallery-container" id="gallery" style="display: none;">
+<h1>Галерея</h1>
+<div class="gallery">
+<!-- Замените src на прямые ссылки к вашим изображениям (например, из Imgur) -->
+            &lt;<img alt="Photo 1" src="https://images2.imgbox.com/61/48/Xd9F8Ce7_o.png"/>
+<img alt="Photo 2" src="https://drive.google.com/file/d/13vuZCxnWy-a5SQtG-5zRgpTchc7-mf3u/view?usp=drive_link"/>
+<img alt="Photo 3" src="https://https://drive.google.com/file/d/1xc1y1BjMFYOu8ItEexoa1UyLexANfPM6/view?usp=drive_link"/>
+<img alt="Photo 4" src="https://drive.google.com/file/d/1500MsPS7Bk7UNx7tBYeULDOvl0XPNXpf/view?usp=drive_link"/>
+<img alt="Photo 5" src="https://via.placeholder.com/300x200?text=Photo+5"/>
+<img alt="Photo 6" src="https://via.placeholder.com/300x200?text=Photo+6"/>
+<img alt="Photo 7" src="https://via.placeholder.com/300x200?text=Photo+7"/>
+<img alt="Photo 8" src="https://via.placeholder.com/300x200?text=Photo+8"/>
+<img alt="Photo 9" src="https://via.placeholder.com/300x200?text=Photo+9"/>
+<img alt="Photo 10" src="https://via.placeholder.com/300x200?text=Photo+10"/>
+<img alt="Photo 11" src="https://via.placeholder.com/300x200?text=Photo+11"/>
+<img alt="Photo 12" src="https://via.placeholder.com/300x200?text=Photo+12"/>
+<img alt="Photo 13" src="https://via.placeholder.com/300x200?text=Photo+13"/>
+<img alt="Photo 14" src="https://via.placeholder.com/300x200?text=Photo+14"/>
+<img alt="Photo 15" src="https://via.placeholder.com/300x200?text=Photo+15"/>
+<img alt="Photo 16" src="https://via.placeholder.com/300x200?text=Photo+16"/>
+<img alt="Photo 17" src="https://via.placeholder.com/300x200?text=Photo+17"/>
+<img alt="Photo 18" src="https://via.placeholder.com/300x200?text=Photo+18"/>
+<img alt="Photo 19" src="https://via.placeholder.com/300x200?text=Photo+19"/>
+<img alt="Photo 20" src="https://via.placeholder.com/300x200?text=Photo+20"/>
+<img alt="Photo 21" src="https://via.placeholder.com/300x200?text=Photo+21"/>
+<img alt="Photo 22" src="https://via.placeholder.com/300x200?text=Photo+22"/>
+<img alt="Photo 23" src="https://via.placeholder.com/300x200?text=Photo+23"/>
+<img alt="Photo 24" src="https://via.placeholder.com/300x200?text=Photo+24"/>
+<img alt="Photo 25" src="https://via.placeholder.com/300x200?text=Photo+25"/>
+<img alt="Photo 26" src="https://via.placeholder.com/300x200?text=Photo+26"/>
+<img alt="Photo 27" src="https://via.placeholder.com/300x200?text=Photo+27"/>
+<img alt="Photo 28" src="https://via.placeholder.com/300x200?text=Photo+28"/>
+<img alt="Photo 29" src="https://via.placeholder.com/300x200?text=Photo+29"/>
+<img alt="Photo 30" src="https://via.placeholder.com/300x200?text=Photo+30"/>
+<img alt="Photo 31" src="https://via.placeholder.com/300x200?text=Photo+31"/>
+<img alt="Photo 32" src="https://via.placeholder.com/300x200?text=Photo+32"/>
+<img alt="Photo 33" src="https://via.placeholder.com/300x200?text=Photo+33"/>
+<img alt="Photo 34" src="https://via.placeholder.com/300x200?text=Photo+34"/>
+<img alt="Photo 35" src="https://via.placeholder.com/300x200?text=Photo+35"/>
+<img alt="Photo 36" src="https://via.placeholder.com/300x200?text=Photo+36"/>
+<img alt="Photo 37" src="https://via.placeholder.com/300x200?text=Photo+37"/>
+<img alt="Photo 38" src="https://via.placeholder.com/300x200?text=Photo+38"/>
+<img alt="Photo 39" src="https://via.placeholder.com/300x200?text=Photo+39"/>
+<img alt="Photo 40" src="https://via.placeholder.com/300x200?text=Photo+40"/>
+</div>
+</div>
+<footer>
+<p>© 2025 Галерея</p>
+</footer>
+<script>
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('auth').classList.add('show');
+        });
+
+        function checkPasscode() {
+            const passcode = document.getElementById('passcode').value;
+            const error = document.getElementById('error');
+            if (passcode === '2508') {
+                document.getElementById('auth').style.display = 'none';
+                const gallery = document.getElementById('gallery');
+                gallery.style.display = 'block';
+                gallery.classList.add('show');
+                loadImages();
+            } else {
+                error.classList.add('show');
+                setTimeout(() => error.classList.remove('show'), 2000);
+            }
+        }
+
+        function loadImages() {
+            const images = document.querySelectorAll('.gallery img');
+            images.forEach((img, index) => {
+                setTimeout(() => {
+                    img.classList.add('loaded');
+                }, index * 100);
+            });
+        }
+
+        document.getElementById('passcode').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') checkPasscode();
+        });
+    </script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const gallery = document.querySelector('.gallery');
+    new Viewer(gallery, {
+        toolbar: true,
+        movable: true,
+        zoomable: true,
+        fullscreen: true,
+    });
+});
+</script>
+
+</body>
+</html>
